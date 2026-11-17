@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420" role="img" aria-labelledby="title desc">
+  <title id="title">Pi Hub — 在桌面整理会话，在终端继续工作</title>
+  <desc id="desc">Pi 的 macOS 会话工作台。保留原生会话，在 Terminal 或 Ghostty 中继续工作。</desc>
+  <rect width="600" height="420" rx="12" fill="#f3f6f7"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <g transform="translate(38 38)">
+      <rect width="38" height="38" rx="7" fill="#285ab0"/>
+      <path d="m10 11 7 8-7 8m12 0h7" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="53" y="27" font-size="24" fill="#52636d">Pi 的 macOS 会话工作台</text>
+      <text x="-3" y="150" font-size="96" font-weight="650" letter-spacing="-5" fill="#26343a">Pi Hub</text>
+      <text x="0" y="217" font-size="38" font-weight="550" fill="#26343a">在桌面整理会话，</text>
+      <text x="0" y="273" font-size="38" font-weight="550" fill="#285ab0">在终端继续工作。</text>
+      <path d="M0 311h524" stroke="#d7e1e6"/>
+      <text x="0" y="352" font-size="24" fill="#64747f">原生 Pi 记录 · Terminal / Ghostty</text>
+    </g>
+  </g>
+</svg>

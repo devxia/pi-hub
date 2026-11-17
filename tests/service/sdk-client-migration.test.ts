@@ -1,0 +1,19 @@
+import {test,expect} from 'vitest';
+import {mkdtemp,mkdir,writeFile,readFile,readdir,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import Database from 'better-sqlite3';
+import {openSessionManagement} from '../../src/session-management/service';
+import type {Result,SessionManagement} from '../../src/session-management/interface';
+const value=<T>(r:Result<T>):T=>{if(r.status==='failed')throw Error(r.error.message);return r.value;};
+test('v14 native-client migration backs up retired operations and preserves project, classification and original Pi bytes',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'pi-sdk-migration-')),project=join(root,'project'),folder=join(root,'sessions','encoded'),db=join(root,'hub.sqlite'),source=join(folder,'source.jsonl');let m:SessionManagement|undefined;
+ await mkdir(project);await mkdir(folder,{recursive:true});const bytes=[{type:'session',version:3,id:'migration-source',cwd:project},{type:'message',id:'u',parentId:null,message:{role:'user',content:'Original native bytes',timestamp:1}}].map(e=>JSON.stringify(e)).join('\n')+'\n';await writeFile(source,bytes);
+ try{
+  m=value(await openSessionManagement(db,{sessionsRoot:join(root,'sessions')}));const b=value(await m.prepareImport({requestId:'import',path:project}))!;await expect.poll(async()=>value(await m!.getImport({batchId:b.id})).state).toBe('ready');value(await m.commitImport({batchId:b.id}));await expect.poll(async()=>value(await m!.getImport({batchId:b.id})).state).toBe('completed');const before=value(await m.getSnapshot());expect(before.sessions[0].classification).toBe('archive');await m.close();m=undefined;
+  const old=new Database(db),retired=['runtime_leases','launch_reservations','clone_requests','recovery_requests','directory_recoveries'];old.exec('DROP TABLE sdk_hosts; DROP TABLE native_clone_requests; PRAGMA user_version=14');for(const table of retired){old.exec(`CREATE TABLE ${table} (id TEXT PRIMARY KEY,data TEXT NOT NULL)`);old.prepare(`INSERT INTO ${table} VALUES(?,?)`).run('historical-request',JSON.stringify({retired:true}));}for(const table of ['terminal_requests','rename_requests','delete_requests'])old.prepare(`INSERT INTO ${table} VALUES(?,?)`).run('historical-request',JSON.stringify({retired:true}));old.close();
+  m=value(await openSessionManagement(db,{sessionsRoot:join(root,'sessions')}));const after=value(await m.getSnapshot());expect(after.projects.map(p=>p.id)).toEqual(before.projects.map(p=>p.id));expect(after.sessions.map(s=>({key:s.key,classification:s.classification}))).toEqual(before.sessions.map(s=>({key:s.key,classification:s.classification})));expect(await readFile(source,'utf8')).toBe(bytes);expect(value(await m.getTerminalOutcome({requestId:'historical-request'}))).toBeNull();expect(value(await m.getRenameOutcome({requestId:'historical-request'}))).toBeNull();expect(value(await m.getDeleteOutcome({requestId:'historical-request'}))).toBeNull();
+  const current=new Database(db,{readonly:true});try{expect(current.pragma('user_version',{simple:true})).toBe(15);const tables=(current.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {name:string}[]).map(r=>r.name);expect(tables).toContain('sdk_hosts');expect(tables).toContain('native_clone_requests');expect(retired.every(t=>!tables.includes(t))).toBe(true);}finally{current.close();}
+  const backup=(await readdir(root)).find(p=>p.startsWith('hub.sqlite.backup-v14-'));expect(backup).toBeTruthy();const saved=new Database(join(root,backup!),{readonly:true});try{expect(saved.pragma('user_version',{simple:true})).toBe(14);expect(saved.prepare('SELECT id FROM clone_requests').all()).toEqual([{id:'historical-request'}]);expect(saved.prepare('SELECT id FROM delete_requests').all()).toEqual([{id:'historical-request'}]);}finally{saved.close();}
+ }finally{await m?.close();await rm(root,{recursive:true,force:true});}
+});

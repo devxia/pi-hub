@@ -1,0 +1,97 @@
+/* Pi Hub · 清爽秩序：样板与生产 renderer 共享的浅色语义变量。
+ * 响应布局、深色覆盖及独立设置窗口规则见 DESIGN.md。
+ */
+:root {
+  /* Surface and text */
+  --paper: #ffffff;
+  --canvas: #f3f6f7;
+  --soft: #f7f9fa;
+  --titlebar: #f6f8f9;
+  --text: #26343a;
+  --muted: #64747f;
+  --line: #e2e8eb;
+  --line-subtle: #edf1f3;
+  --control-line: #c7d2d8;
+  --nav-text: #536674;
+  --project-text: #546873;
+  --project-title: #3d505c;
+  --utility-text: #526773;
+  --icon-muted: #71818c;
+
+  /* Selection, feedback and focus */
+  --accent: #285ab0;
+  --selected: #eaf0fa;
+  --selected-text: #234f96;
+  --good: #3d745e;
+  --busy: #a46d2c;
+  --warning: #956021;
+  --danger-text: #b14e46;
+  --danger-fill: #a7433c;
+  --primary-foreground: #ffffff;
+  --focus: var(--accent);
+  --hover: color-mix(in srgb, var(--accent) 7%, transparent);
+  --scrim: #0004;
+
+  /* Typography */
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+  --font-body: 13px;
+  --font-control: 12px;
+  --font-meta: 11px;
+  --font-scope-title: 21px;
+  --font-preview-title: 19px;
+  --font-dialog-title: 17px;
+  --line-body: 1.5;
+  --line-reading: 1.9;
+  --weight-body: 400;
+  --weight-strong: 550;
+  --weight-emphasis: 600;
+
+  /* Spacing, shape and icons */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --radius-control: 5px;
+  --radius-menu: 7px;
+  --radius-dialog: 10px;
+  --border-width: 1px;
+  --focus-width: 2px;
+  --icon-size: 18px;
+  --icon-small: 15px;
+  --icon-stroke: 1.65;
+  --shadow-menu: 0 12px 36px #0002;
+  --shadow-dialog: 0 18px 70px #0003;
+  --shadow-notice: 0 5px 22px #0002;
+
+  /* Selected desktop reference geometry, not fixed dimensions for every viewport */
+  --reference-width: 1440px;
+  --reference-height: 900px;
+  --titlebar-height: 40px;
+  --sidebar-width: 208px;
+  --reference-list-width: 650px;
+  --reference-preview-width: 582px;
+  --scope-header-height: 70px;
+  --scope-tabs-height: 44px;
+  --tools-height: 66px;
+  --session-height: 78px;
+  --preview-header-height: 52px;
+  --footer-height: 36px;
+  --control-height: 34px;
+  --settings-width: 760px;
+  --settings-height: 550px;
+  --settings-nav-width: 156px;
+
+  /* Motion: ease-out for appearance/reordering; shorter ease-in for dismissal */
+  --fast: 130ms;
+  --move: 220ms;
+  --press: 80ms;
+  --menu-enter: 180ms;
+  --notice-enter: 200ms;
+  --dismiss: 120ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+}

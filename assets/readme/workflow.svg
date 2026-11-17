@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="274" viewBox="0 0 1200 274" role="img" aria-labelledby="title desc">
+  <title id="title">添加项目，整理会话，在终端继续</title>
+  <desc id="desc">三个步骤：选择项目和需要管理的历史，搜索预览并整理分类，然后在 Terminal 或 Ghostty 打开原会话。原生 Pi 记录始终保留。</desc>
+  <rect width="1200" height="274" rx="10" fill="#f7f9fa"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <g id="project" transform="translate(48 34)">
+      <text y="27" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" fill="#285ab0">01</text>
+      <text y="82" font-size="32" font-weight="600" fill="#26343a">添加项目</text>
+      <text y="120" font-size="22" fill="#52636d">选择目录与历史</text>
+    </g>
+    <g id="organize" transform="translate(448 34)">
+      <text y="27" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" fill="#285ab0">02</text>
+      <text y="82" font-size="32" font-weight="600" fill="#26343a">整理会话</text>
+      <text y="120" font-size="22" fill="#52636d">搜索、预览、归档</text>
+    </g>
+    <g id="continue" transform="translate(848 34)">
+      <text y="27" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" fill="#285ab0">03</text>
+      <text y="82" font-size="32" font-weight="600" fill="#26343a">终端继续</text>
+      <text y="120" font-size="22" fill="#52636d">Terminal / Ghostty</text>
+    </g>
+    <g fill="none" stroke="#99afbe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M330 108h56m-7-7 7 7-7 7M730 108h56m-7-7 7 7-7 7"/>
+    </g>
+    <path d="M48 192h1104" stroke="#e2e8eb"/>
+    <text x="48" y="236" font-size="21" fill="#52636d">一份原生 Pi 记录，连接桌面管理与终端工作。</text>
+  </g>
+</svg>

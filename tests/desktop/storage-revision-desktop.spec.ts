@@ -1,0 +1,70 @@
+import {openSettings,closeSettings} from '../fixtures/settings-window';
+import {launchOwnedElectron} from '../fixtures/owned-electron';
+import { test, expect, _electron as electron } from '@playwright/test';
+import { mkdtemp, mkdir, writeFile, readFile, rm, rename } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+const evidence = resolve(process.env.PI_HUB_TEST_EVIDENCE ?? '.scratch/pi-hub-test-runs/storage-revision-desktop');
+
+test('packaged default storage needs no checking prompt, overlapping import stays shielded, and a failed root explains actual recovery', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'pi-hub-06-revision-ui-'));
+  const standard = join(root, 'standard'); const encoded = join(standard, 'encoded'); const project = join(root, 'Orchard');
+  for (const path of [encoded, project, evidence]) await mkdir(path, { recursive: true });
+  const app = await launchOwnedElectron(root,join(root,'profile'),join(root,'agent'),standard,evidence);
+  try {
+    const page = await app.firstWindow();
+    await app.evaluate(({ nativeTheme, BrowserWindow }) => { nativeTheme.themeSource = 'light'; BrowserWindow.getAllWindows()[0].setSize(1440, 900); });
+    await expect(page.getByRole('heading', { name: '从一个项目开始' })).toBeVisible();
+    await expect(page.getByText(/存储位置待核对|正在核对存储位置|添加项目后核对存储位置/)).toHaveCount(0);
+    await expect(page.locator('.directory-warning')).toHaveCount(0);
+    await page.screenshot({ path: join(evidence, 'default-location-light.png') });
+    let settings = await openSettings(app,page,'会话存储');
+    await expect(settings.getByLabel('新位置的枚举方式', { exact: true })).toHaveValue('flat');
+    await expect(settings.locator('.storage-list')).toContainText(standard);
+    await expect(page.getByText(/存储位置待核对|正在核对存储位置|添加项目后核对存储位置/)).toHaveCount(0);
+    await settings.screenshot({ path: join(evidence, 'new-location-enumeration.png') });
+    await closeSettings(settings);
+    await app.evaluate(({ dialog }, path) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] }); }, project);
+    await page.getByRole('button', { name: '添加项目', exact: true }).first().click();
+    await expect(page.getByRole('button', { name: '确认添加项目' })).toBeEnabled();
+    await page.getByRole('button', { name: '确认添加项目' }).click(); await expect(page.getByRole('dialog')).toHaveCount(0);
+    settings = await openSettings(app,page,'会话存储');
+    const file = join(encoded, 'pending.jsonl');
+    const bytes = [{ type: 'session', version: 3, id: 'pending', cwd: project }, { type: 'message', id: 'm', parentId: null, message: { role: 'user', content: 'Overlapping history stays a choice', timestamp: 1767225600000 } }].map(entry => JSON.stringify(entry)).join('\n') + '\n';
+    // Create the owned fixture as the OS chooser returns, before the watcher debounce runs.
+    await app.evaluate(({ dialog }, fixture) => {
+      dialog.showOpenDialog = async () => { process.getBuiltinModule('node:fs').writeFileSync(fixture.file, fixture.bytes); return { canceled: false, filePaths: [fixture.folder] }; };
+    }, { file, bytes, folder: encoded });
+    await settings.getByRole('button', { name: '选择并添加存储位置' }).click();
+    await expect(settings.getByRole('dialog', { name: '选择历史会话' })).toBeVisible();
+    await expect(settings.getByRole('checkbox')).toHaveCount(1);
+    await expect(settings.getByRole('checkbox')).not.toBeChecked();
+    await app.evaluate(({dialog})=>{(globalThis as any).settingsBusyPrompt='';(dialog as any).showMessageBox=async(_window:any,options:any)=>{(globalThis as any).settingsBusyPrompt=options.message;return {response:0,checkboxChecked:false};};});await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Pi Hub 设置')!.close());await expect.poll(()=>app.evaluate(()=>(globalThis as any).settingsBusyPrompt)).toBe('请先完成当前设置操作');expect(settings.isClosed()).toBe(false);await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.evaluate(() => window.sessionManagement.reconcile());
+    await expect.poll(async () => page.evaluate(async () => { const result = await window.sessionManagement.getSnapshot(); return result.status === 'completed' ? result.value.discovery.state : 'failed'; })).toBe('completed');
+    const snapshot = await page.evaluate(() => window.sessionManagement.getSnapshot());
+    expect(snapshot.status === 'completed' && snapshot.value.sessions.length).toBe(0);
+    await settings.screenshot({ path: join(evidence, 'overlap-ready-shielded.png') });
+    await settings.getByRole('button', { name: '确认添加存储位置' }).click(); await expect(settings.getByRole('dialog')).toHaveCount(0);await closeSettings(settings);
+    await expect(page.locator('.session-row')).toHaveCount(0);
+    await page.getByRole('button', { name: '归档', exact: true }).click();
+    await expect(page.locator('.session-row')).toHaveCount(1);
+    await expect(page.locator('.session-row')).toContainText('Overlapping history stays a choice');
+    settings = await openSettings(app,page,'会话存储');
+    await settings.getByRole('button', { name: '移除', exact: true }).click(); await settings.getByRole('button', { name: '确认移除存储位置' }).click(); await closeSettings(settings);
+    await rename(standard, standard + '-held'); await page.getByRole('button', { name: '重新扫描', exact: true }).click();
+    await expect(page.locator('.directory-warning')).toContainText('存储位置不可用');
+    await expect(page.locator('.directory-warning')).not.toContainText('其他');
+    settings = await openSettings(app,page,'会话存储');
+    await expect(settings.locator('.storage-error')).toContainText('自动核对');
+    await expect(settings.locator('.storage-error')).toContainText('关闭设置并点击「重新扫描」');
+    await app.evaluate(({ nativeTheme, BrowserWindow }) => { nativeTheme.themeSource = 'dark'; BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Pi Hub 设置')!.setSize(680, 520); }); await settings.emulateMedia({ colorScheme: null });
+    await settings.screenshot({ path: join(evidence, 'single-location-unavailable-dark.png') });
+    await rename(standard + '-held', standard); await closeSettings(settings); await page.getByRole('button', { name: '重新扫描', exact: true }).click();
+    await expect(page.locator('.directory-warning')).toHaveCount(0); await expect(page.locator('.session-row')).toHaveCount(1);
+    const after = await readFile(file); const hash = (data: string | Buffer) => createHash('sha256').update(data).digest('hex');
+    expect(hash(after)).toBe(hash(bytes));
+    await writeFile(join(evidence, 'revision-source-hashes.json'), JSON.stringify({ before: hash(bytes), after: hash(after), unchanged: true }, null, 2));
+  } finally { await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Pi Hub 设置')?.destroy());await app.close(); await rm(root, { recursive: true, force: true }); }
+});

@@ -1,0 +1,55 @@
+{
+  "name": "pi-hub",
+  "productName": "Pi Hub",
+  "version": "0.1.0",
+  "description": "macOS workspace for Pi projects and sessions",
+  "author": "Pi Hub contributors",
+  "private": true,
+  "type": "module",
+  "main": "dist/desktop/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron-forge start",
+    "package": "npm run build && electron-forge package --platform=darwin --arch=x64,arm64 && node scripts/check-package.mjs",
+    "package:x64": "npm run build && electron-forge package --platform=darwin --arch=x64 && node scripts/check-package.mjs --arch x64",
+    "package:arm64": "npm run build && electron-forge package --platform=darwin --arch=arm64 && node scripts/check-package.mjs --arch arm64",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:ui": "playwright test --project=desktop",
+    "test:ui:foreground": "playwright test --project=desktop-foreground",
+    "test:native": "node scripts/test-native.mjs",
+    "test:quick": "vitest run --project quick",
+    "test:integration": "vitest run --project integration",
+    "test:checks": "node --test tests/checks/*.test.mjs",
+    "check:project": "node scripts/check-project.mjs",
+    "check:package": "node scripts/check-package.mjs",
+    "check": "npm run typecheck && npm run check:project && npm run test:checks"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.5.2",
+    "better-sqlite3": "13.0.3",
+    "lucide-react": "1.71.0",
+    "proper-lockfile": "4.1.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "8.0.1",
+    "@playwright/test": "1.65.0",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "electron": "45.2.3",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.7",
+    "vitest": "5.1.0"
+  },
+  "config": {
+    "forge": "./forge.config.cjs"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
