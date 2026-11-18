@@ -151,7 +151,8 @@ export interface RuntimeDiagnostic {
 export interface OpenSessionRequest {
   requestId: string;
   intent: 'resume' | 'new';
-  projectId: string;
+  projectId?: string;
+  remoteTaskId?: string;
   key?: string;
   identity?: string;
   runtimeProjectId?: string;

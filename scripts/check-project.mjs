@@ -10,7 +10,7 @@ export function checkPackagePolicy(config) {
   const patterns = config.packagerConfig?.ignore;
   if (!Array.isArray(patterns) || patterns.some(pattern => !(pattern instanceof RegExp))) throw Error('Package exclusions must be explicit regular expressions.');
   const excluded = path => patterns.some(pattern => { pattern.lastIndex = 0; return pattern.test(path); });
-  const accepted = ['/package.json', '/node_modules', '/node_modules/example/index.js', '/dist', '/dist/desktop', '/dist/desktop/main.cjs', '/dist/renderer/assets/app.js', '/dist/terminal/sdk-host.mjs'];
+  const accepted = ['/package.json', '/node_modules', '/node_modules/example/index.js', '/dist', '/dist/desktop', '/dist/desktop/main.cjs', '/dist/renderer/assets/app.js', '/dist/terminal/sdk-host.mjs', '/dist/remote/cli.mjs', '/dist/remote/runner.py'];
   const rejected = ['/tests/example.spec.ts', '/.scratch/evidence.json', '/scripts/build.mjs', '/out/old.app', '/assets/readme/hero.svg', '/dist/packages/Pi Hub.app/Contents/MacOS/Pi Hub', '/dist/build-receipt.json', '/dist/unknown/file.js'];
   for (const path of accepted) if (excluded(path)) throw Error('Required runtime path excluded: ' + path);
   for (const path of rejected) if (!excluded(path)) throw Error('Development/output path can enter a package: ' + path);

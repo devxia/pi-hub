@@ -1,3 +1,4 @@
+import type { NativePiBridge, Reply } from '../remote/contract';
 import type { TrashAdapterReply } from './trash-adapter';
 import type {
   TerminalAdapterCommand,
@@ -31,6 +32,18 @@ const databasePath = process.argv[2];
 let manager: SessionManagement | undefined;
 let queue = Promise.resolve();
 let adapterSequence = 0;
+const nativeReplies = new Map<number, (reply: Reply) => void>();
+const nativePi: NativePiBridge = (request) => new Promise((resolve) => {
+  const id = ++adapterSequence;
+  const finish = (reply: Reply) => {
+    clearTimeout(timer);
+    nativeReplies.delete(id);
+    resolve(reply);
+  };
+  const timer = setTimeout(() => finish({ ok: false, error: '远端任务响应超时，请核对原操作。' }), 10000);
+  nativeReplies.set(id, finish);
+  port.postMessage({ nativePi: { id, request } });
+});
 const adapterReplies = new Map<
   number,
   {
@@ -114,8 +127,13 @@ port.on(
       request?: unknown;
       trashAdapterReply?: TrashAdapterReply;
       terminalAdapterReply?: TerminalAdapterReply;
+      nativePiReply?: { id: number; reply: Reply };
     };
   }) => {
+    if (data.nativePiReply) {
+      nativeReplies.get(data.nativePiReply.id)?.(data.nativePiReply.reply);
+      return;
+    }
     const trash = data.trashAdapterReply;
     if (trash) {
       const pending = trashReplies.get(trash.id);
@@ -146,6 +164,7 @@ port.on(
           const opened = await openSessionManagement(databasePath, {
             sessionsRoot: process.env.PI_HUB_SESSIONS_ROOT,
             deletion,
+            nativePi,
             terminal: {
               appData: dirname(databasePath),
               adapter: terminalAdapter,

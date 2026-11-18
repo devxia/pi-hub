@@ -9,6 +9,7 @@ import { observeProcess } from './runtime-process';
 import { requireMissingCwd } from './missing-cwd';
 import type { RuntimeOptions, piConfiguration } from './pi-configuration';
 import type { runtimeHosts } from './runtime-hosts';
+import type { NativePiBridge, NativeTaskScope } from '../remote/contract';
 import type { ManualHandoff, ManualInspection } from './manual-handoff';
 import {
   completed,
@@ -88,8 +89,10 @@ export interface TerminalOptions {
   startupAssetPath?: string;
   adapter: TerminalAdapter;
   ghosttyAdapter?: TerminalAdapter;
+  nativePi?: NativePiBridge;
 }
 interface Operation {
+  nativeTask?: NativeTaskScope;
   request: OpenSessionRequest;
   terminal: ExternalTerminal;
   installed: TerminalIdentity;
@@ -244,13 +247,17 @@ export function terminalSettings(
       typeof request.requestId !== 'string' ||
       !/^[a-zA-Z0-9-]{1,128}$/.test(request.requestId) ||
       !['new', 'resume'].includes(request.intent) ||
-      typeof request.projectId !== 'string' ||
+      (request.remoteTaskId === undefined
+        ? typeof request.projectId !== 'string'
+        : typeof request.remoteTaskId !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(request.remoteTaskId) ||
+          request.projectId !== undefined || request.intent !== 'new') ||
       Object.keys(request).some(
         (k) =>
           ![
             'requestId',
             'intent',
             'projectId',
+            'remoteTaskId',
             'key',
             'identity',
             'runtimeProjectId',
@@ -304,21 +311,29 @@ export function terminalSettings(
     const launch = status.value.launch;
     if (!status.value.configured || !launch?.externalSdk)
       return failed('PI_MISSING', '请先检测并保存Pi1.5.2启动配置。');
+    let nativeTask: NativeTaskScope | undefined;
+    if (request.remoteTaskId) {
+      const scope = await options.nativePi?.({ command: 'bind', taskId: request.remoteTaskId });
+      if (!scope?.ok) return failed('IMPORT_UNAVAILABLE', '远端任务已变化或暂不可用。');
+      nativeTask = scope.value as NativeTaskScope;
+      if (old && JSON.stringify(old.nativeTask) !== JSON.stringify(nativeTask))
+        return failed('RECORD_CHANGED', '远端任务的项目或服务器已变化，请重新打开。');
+    }
     const result = await snapshot();
     if (result.status === 'failed') return result;
     const project = result.value.projects.find((p) => p.id === request.projectId),
       s = result.value.sessions.find((s) => s.key === request.key);
-    if (!project) return failed('RECORD_CHANGED', '目标项目已变化。');
+    if (!project && !nativeTask) return failed('RECORD_CHANGED', '目标项目已变化。');
     if (
       request.intent === 'resume' &&
       (!s ||
         s.identity !== request.identity ||
-        s.projectId !== project.id ||
+        s.projectId !== project?.id ||
         s.availability.state !== 'available' ||
         s.identityConflict)
     )
       return failed('RECORD_CHANGED', '原会话身份或记录位置已变化。');
-    let cwd = request.intent === 'resume' ? s!.cwd : project.path;
+    let cwd = request.intent === 'resume' ? s!.cwd : (nativeTask?.project ?? project!.path);
     try {
       if (!statSync(cwd).isDirectory()) throw Error();
     } catch {
@@ -356,7 +371,7 @@ export function terminalSettings(
         'terminal-launches',
         request.requestId + '.' + attemptId + '.status.json',
       ),
-      hostId = hosts.register(request.requestId, statusPath);
+      hostId = hosts.register(request.requestId, statusPath, nativeTask);
     const descriptor: TerminalLaunchDescriptor = {
       hostId,
       credentialPath: hosts.credentialPath,
@@ -371,7 +386,7 @@ export function terminalSettings(
       sessionDir:
         request.intent === 'resume'
           ? dirname(s!.sourcePath)
-          : join(sessionsRoot, `--${project.path.slice(1).replaceAll('/', '-')}--`),
+          : join(sessionsRoot, `--${cwd.slice(1).replaceAll('/', '-')}--`),
       executable: launch.nodePath,
       argv: [],
       appData: runtime.appData,
@@ -392,6 +407,7 @@ export function terminalSettings(
     };
     const operation: Operation = {
       request,
+      nativeTask,
       terminal: selected,
       installed: inspected,
       descriptor,

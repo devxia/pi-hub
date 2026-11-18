@@ -1,6 +1,8 @@
 /** Keep native modal focus restoration when React removes the dialog. */
-export function showDialog(dialog: HTMLDialogElement | null) {
-  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+export function showDialog(
+  dialog: HTMLDialogElement | null,
+  opener = document.activeElement instanceof HTMLElement ? document.activeElement : null,
+) {
   dialog?.showModal();
   return () => {
     const shouldRestore =

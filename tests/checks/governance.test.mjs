@@ -62,6 +62,7 @@ async function packageFixture(root) {
     'src/renderer/main.tsx': 'export const app = 1;', 'scripts/build.mjs': '// synthetic build',
     'package.json': JSON.stringify({name: 'pi-hub', productName: 'Pi Hub', version: '0.1.0', dependencies: {'@earendil-works/pi-coding-agent': '1.5.2'}}),
     'package-lock.json': '{}', 'forge.config.cjs': '{}', 'tsconfig.json': '{}', 'docs/design/clear-order.tokens.css': ':root{}',
+    'dist/remote/cli.mjs':'export {};', 'dist/remote/runner.py':'# fixture', 'dist/remote/supervisor.py':'# fixture', 'dist/remote/secure-fs.node':machO('x64'),
     'dist/desktop/main.cjs': 'console.log(1);', 'dist/renderer/index.html': '<main></main>', 'dist/terminal/sdk-host.mjs': 'export {};',
   })) await put(root, path, content);
   const receipt = await writeBuildReceipt(root), app = join(root, 'fixture.app');
@@ -71,7 +72,7 @@ async function packageFixture(root) {
   for (const path of Object.keys(receipt.runtime)) await put(files, path, await readFile(join(root, path)));
   const archive = join(app, 'Contents/Resources/app.asar');
   await mkdir(join(archive, '..'), {recursive: true});
-  await asar.createPackage(files, archive);
+  await asar.createPackageWithOptions(files, archive, {unpack: '{**/*.node,**/dist/remote/**}'});
   for (const path of [
     'Contents/MacOS/Pi Hub', 'Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework',
     'Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/prebuilds/darwin-x64.node',
@@ -82,18 +83,18 @@ async function packageFixture(root) {
 
 test('package gate binds current build and catches wrong CPU, changed assets and unexpected output files', () => temporary(async root => {
   const {app, archive, files} = await packageFixture(root);
-  assert.equal((await checkPackage({root, app, arch: 'x64'})).runtimeAssets, 3);
+  assert.equal((await checkPackage({root, app, arch: 'x64'})).runtimeAssets, 7);
   const binary = 'Contents/MacOS/Pi Hub';
   await put(app, binary, machO('arm64'));
   await assert.rejects(checkPackage({root, app, arch: 'x64'}), /CPU mismatch/);
   await put(app, binary, machO('x64'));
   await put(files, 'dist/desktop/main.cjs', 'tampered();');
-  await asar.createPackage(files, archive);
+  await asar.createPackageWithOptions(files, archive, {unpack: '{**/*.node,**/dist/remote/**}'});
   asar.uncache(archive);
   await assert.rejects(checkPackage({root, app, arch: 'x64'}), /Runtime asset mismatch/);
   await put(files, 'dist/desktop/main.cjs', await readFile(join(root, 'dist/desktop/main.cjs')));
   await put(files, 'dist/packages/old.app/Contents/Info.plist', 'unwanted old package');
-  await asar.createPackage(files, archive);
+  await asar.createPackageWithOptions(files, archive, {unpack: '{**/*.node,**/dist/remote/**}'});
   asar.uncache(archive);
   await assert.rejects(checkPackage({root, app, arch: 'x64'}), /Unexpected development\/output path/);
 }));

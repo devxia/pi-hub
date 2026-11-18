@@ -18,6 +18,9 @@ import { homedir } from 'node:os';
 import { mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { BackgroundSessionManagement } from './background';
+import { chooseRemote, readDefaultSSHPreview } from './remote-chooser';
+import { RemoteBackground } from './remote-background';
+import type {Request as RemoteRequest} from '../remote/contract';
 import { validSessionQuery } from '../session-management/session-list';
 import type { SessionListRequest } from '../session-management/interface';
 import { failed, completed } from '../session-management/interface';
@@ -40,6 +43,7 @@ else {
   const rendererURL = pathToFileURL(rendererPath).href;
   let window: BrowserWindow | undefined;
   const settings = new SettingsWindow(rendererPath, rendererURL);
+  let remote: RemoteBackground;
   let quitting = false;
   let checkingQuit = false;
   let pickerOpen = false;
@@ -106,24 +110,47 @@ else {
     checkingQuit = true;
     void settings
       .confirmClose()
-      .then((allowed) => {
+      .then(async (allowed) => {
         if (!allowed) return;
+        const pending = remote ? await remote.call('pending') : {ok: true, value: 0};
+        if (!pending.ok || Number(pending.value) > 0) {
+          const answer = await dialog.showMessageBox({type:'warning',buttons:['继续使用','退出'],defaultId:0,cancelId:0,message:'远端操作仍在进行或状态未确定。',detail:'退出将停止本机连接。远端任务不会被取消；重新打开后需核对原操作，不会自动重发。'});
+          if (answer.response !== 1) return;
+        }
         quitting = true;
         settings.destroy();
-        return background.close().finally(() => app.quit());
+        return Promise.all([background.close(), remote?.close()]).finally(() => app.quit());
       })
       .finally(() => {
         checkingQuit = false;
       });
   });
   void app.whenReady().then(() => {
+    remote = new RemoteBackground(app.getPath('userData'), snapshot => {
+      if (window && !window.isDestroyed()) window.webContents.send('remote:changed', snapshot);
+    });
     background = new BackgroundSessionManagement(
       join(app.getPath('userData'), 'projects.sqlite'),
       (snapshot) => {
         if (window && !window.isDestroyed()) window.webContents.send('workspace:changed', snapshot);
         settings.send('workspace:changed', snapshot);
       },
+      remote.callNative,
     );
+    ipcMain.handle('remote:request', (event, request: RemoteRequest, ...extra: unknown[]) => {
+      if (!trusted(event) || extra.length) return {ok:false,error:'Invalid remote workspace authority.'};
+      return remote.call(request);
+    });
+    ipcMain.handle('remote:previewDefaultSSH', (event, ...args: unknown[]) => {
+      if (!trusted(event) || args.length) return { ok: false, error: '无效的默认 SSH 配置请求。' };
+      return readDefaultSSHPreview();
+    });
+    ipcMain.handle('remote:choose', async (event, kind: import('../remote/contract').RemoteChoice, project?:string, ...extra:unknown[]) => {
+      if (!trusted(event) || extra.length || !window || !['config','knownHosts','project','inputs','destination','identity'].includes(kind) || (project!==undefined&&typeof project!=='string')) return {ok:false,error:'无效的文件选择请求。'};
+      if(pickerOpen)return {ok:false,error:'请先完成当前选择。'};
+      pickerOpen=true;
+      try{return await chooseRemote(window,kind,project);}finally{pickerOpen=false;}
+    });
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
         {
@@ -709,6 +736,7 @@ else {
               'requestId',
               'intent',
               'projectId',
+              'remoteTaskId',
               'key',
               'identity',
               'runtimeProjectId',
@@ -718,8 +746,10 @@ else {
         ) ||
         typeof request.requestId !== 'string' ||
         !/^[a-zA-Z0-9-]{1,128}$/.test(request.requestId) ||
-        typeof request.projectId !== 'string' ||
-        !/^[a-zA-Z0-9-]{1,128}$/.test(request.projectId) ||
+        (request.remoteTaskId === undefined
+          ? typeof request.projectId !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(request.projectId)
+          : typeof request.remoteTaskId !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(request.remoteTaskId) ||
+            request.projectId !== undefined || request.intent !== 'new') ||
         !['resume', 'new'].includes(request.intent) ||
         (request.intent === 'resume' &&
           (!/^[a-f0-9]{64}$/.test(request.key) || !/^[a-f0-9]{64}$/.test(request.identity)))

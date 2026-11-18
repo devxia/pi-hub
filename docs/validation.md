@@ -47,9 +47,9 @@ npm run test:ui -- tests/desktop/settings-window-desktop.spec.ts tests/desktop/s
 
 29 个仅在本机存在的证据链接改成代码路径，并保留原有版本、数字、失败与限制。22 个正式 Markdown 的 88 个仓库本地链接不再依赖 `.scratch` 是否存在；上方命令用于新运行，不代表已在全新检出或公共 CI 上执行本轮验收。原始结果和核对位于本机 `.scratch/pi-hub-maintainability/evidence/`；已有暂存内容、README/资产、固化更新设计和安装应用保留，未提交或推送。
 
-## 当前安装基线
+## 设置文字版本安装基线
 
-当前安装应用为 `/Users/xiabinbin/Applications/Pi Hub.app`，最近生产变更为 `75a3e1c`（侧栏“设置”文字）。包内/外部 Pi 为 1.5.2，67 个源码/配置文件与 7 个运行资产绑定。
+该阶段安装应用为 `/Users/xiabinbin/Applications/Pi Hub.app`，最近生产变更为 `75a3e1c`（侧栏“设置”文字）。包内/外部 Pi 为 1.5.2，67 个源码/配置文件与 7 个运行资产绑定。
 
 ASAR SHA-256：`3e35ed342c69bac3bf08cf1e91ed6573e0c126e8d06d08319130f3463a5a6573`。文档和样板整理不等于重做生产绑定；文件时间/文档注释变化也不能伪称已重新打包。
 
@@ -111,3 +111,77 @@ arm64 完成构建、CPU/依赖/包内容及代码签名数据核对，尚无 Ap
 ## 文档维护
 
 检查只在实际重新执行后追加当前版本结果。被替代的产品决策、阶段规格/issue/提案及文字报告从工作树删除；原始回执按上述版本边界保留。此次整理的路径清单与静态结果在整理清单（本机：`.scratch/pi-hub-docs-consolidation/manifest.json`）和检查结果（本机：`.scratch/pi-hub-docs-consolidation/checks.json`）。
+
+## 2026-11-17 远端工作区首次交接（父审拒绝，历史记录）
+
+本次以 main `8bde422557419dc2d7047409ade22d2490c98ce1` 为基线，实施 M1/M2/M3 及普通 Linux/Slurm 双 adapter；不是整体功能验收。正式契约见[远端工作区](remote-workspace.md)与 ADR0007，原提案的原文保存在本机 `.scratch/pi-hub-remote-workspace/evidence/approved-plan.md`，当前正文不再保留被替代的正式提案。完整交接、逐项实施/测试矩阵与失败回执索引在同目录 `development-report.md`。
+
+最终源码检查 `check-quit-fix` 通过类型、项目策略及 7 项治理检查；过滤 quick `remote-contract` 18 项通过；显式 integration `remote-boundaries remote-ssh` 13 项通过。独立运行的 `full-isolated` 为 23 文件、162 测试通过，另有原有 opt-in scale 1 项跳过，未新增 skip/移除/放宽原断言。`package-quit-fix` 双架构及自动验包通过。精确 x64 包资产在 unchanged owned quiet harness 中运行四个 desktop 目标，共 6 测试通过：工作区、实际 unpacked CLI、已有 settings、已有 terminal choice。CLI 在仓库外 cwd 经 Node24 和精确 owned profile 运行，拒绝过期/撤销/越界/自批/相同 request 不同摘要/包篡改，并核对 Hub 停止时不可用。篡改后恢复原字节并再次验包通过。
+
+实际检查 light/dark、1440/860、原生 modal 背景 inert、Escape/Tab/焦点恢复、错误保留和 Slurm 草稿审核截图；精确 utility SIGKILL 时的自有 blackhole SSH 被主进程按持久 PID/启动身份清理，新 generation 在旧 writer 退出后建立。失败的首个 UI 缺可执行路径、早期 dist 重建竞态、合成包 fixture/ASAR unpack 模式、开发期间字段/类型错误、modal 测试时序均保留。已有 terminal choice 测试发现真实 `/var` 与 `/private/var` profile 导致退出误报远端未决的回归；已修复 canonical profile，并避免仅退出时新建从未打开的 remote DB，原测试不改即通过。一次与 UI 并行的 full run 中，原 discovery-work 在原 5000ms 限制超时；串行隔离重跑全部通过，原测试及超时均未调整。
+
+核对 npm latest/包声明/锁/本机依赖/外部安装版本元数据/双架构包均 Pi 1.5.2，Node v24.16.0（`/usr/local/bin/node`），Electron 45.2.3，Darwin x64。未升级全局环境、安装应用、连接真实用户服务器或读取真实配置/密钥/会话/凭据。原 quiet fixture 的原生隔离与精确 PID 清理保持。
+
+最终构建 receipt SHA-256 `1932c03b2acf6a66d21ed3707252df896dbe39c1644560aa01cd0edb74052409`，源码输入 aggregate `bdc59c34d976e0ca66d9f1235983c5e820033995541f5fd756422d38a781fa25`；x64 ASAR `e4d9fa97f894a14b1ad4a981435ada1069bcabfbe4256742b80c2fc5c0eb7a55`，arm64 ASAR `1fa44abb7261a543d9eaa37ecc0b3ce033b8436eaa3419e4c7eb6a87c50dd3e3`。完整 per-file receipt/pins、双架构 CPU 校验、实际命令 argv/cwd/退出码/时间及旧失败见本机 evidence；源码输入已移除生成的 Python cache。文档/测试时序更正另由工作树记录。
+
+真实 Linux 最后登录退出保留、完整 subreaper/TERM/KILL/ECHILD/崩溃/自然完成竞态、Slurm controller 的受约束取消/JobID 复用/提交接受断点尚未有授权环境运行，对应能力保持关闭。普通 Linux/Slurm 写 adapter 已实施但端到端未验证；不能将语法、包或 GUI 草稿通过当成远端运行成功。首次交接当时缺少自动化远端能力验收/receipt 工具；父审因此及流式 SFTP 等范围缺口拒绝交接。此历史结果不能作为修订后源码的验收，现行工具契约见 remote-workspace.md 第 10 节。首次交接未运行实际 arm64 硬件或前台安装 .app 验收。
+
+## 2026-11-18 远端工作区第二轮修订
+
+源码基于 `8bde422557419dc2d7047409ade22d2490c98ce1`。本轮单独取证在 `.scratch/pi-hub-remote-workspace/evidence/revision2/`，包括命令 argv、退出码、时间、完整日志、构建收据和仓库外包校验。Pi 最新版、声明、锁、依赖、外部 CLI 及双架构包均为 1.5.2。本机为 Intel macOS，Node 24.16.0，Electron 45.2.3。
+
+`check-final` 类型、项目策略及 7 项治理检查通过。`quick-final` 2 文件、21 项通过；`integration-final` 4 文件、29 项通过。通过正常入口检查 retained fd 读取契约、异步审核的稳定 ID、1,101 项精确清单分页、过期与重启清理、真实回环 SFTP 的中断计数与完整发布、Agent CLI 的历史项目范围、延迟响应下的新状态保留。初次 integration 的 fixture 误传普通路径导致 1 项失败，原始回执仍在 `runs/integration-initial/`。
+
+`package-final` 与 `check-package-final` 验证 Intel 和 arm64 macOS 包。构建收据 SHA-256 为 `85f18239992387f2bba6fddfd4cefde0a7a1fed786d7c60e644a75bfc6f6cc62`，95 项输入的聚合值为 `f0627d57d81dae3052a4b299edf7a6d22d92fa99c23033b3bcd6ddbfc04ba20b`。x64 ASAR 为 `9f669ac0016675e9972290c864967e19732ebc81b6ff4752171104ddad6bf80b`，arm64 ASAR 为 `10a1afd71dae313b60ca26fd1f94da177492f13626ead2fbf5a506c0c4cce43c`。`outside-package.json` 记录两份仓库外副本的逐包 CPU、21 项运行资源及实际解包 CLI 校验，arm64 Electron 未在 Apple Silicon 运行。
+
+`full-final` 26 文件、181 项通过，既有 opt-in scale 1 项跳过。静默运行用同一精确 x64 包，`ui-final` 6 项通过、2 项失败。修正 CLI 测试的 JSON 包装读取与窄布局测试的切换等待后，`ui-followup` 原失败的 2 项通过。静默证据合计 8 个不同用例，来自两次运行。`foreground-final` 使用仓库外 x64 `.app` 可执行文件，3 项通过。桌面篡改测试恢复原字节后，`check-copy-restored` 两份仓库外包再次通过，ASAR 摘要与本轮收据相同。
+
+本机 runner 测试包括实际持有的目录描述符和合成 Slurm 协议输出。真实 Linux `/proc`、最后 SSH 登录退出后的保留、scope/reaping 与信号生命周期，以及 Slurm controller 提交恢复、身份和取消矩阵仍须在另行授权的环境执行。本轮没有发布远程 verified 能力。
+
+独立复测使用同一份最终源码和应用包。远端协议、流式 SFTP 和操作边界共 3 文件、28 项通过。仓库外 Intel 应用包的工作区、实际 Agent CLI、设置窗口及终端选择在一次静默运行中 8 项全部通过。9 份清理回执记录的 50 个 Electron 进程身份均已结束。复测前后均校验了仓库外两种架构的应用包，95 项构建输入、21 项运行资源及两个 ASAR 摘要与本轮构建收据一致。本机汇总记录在 `.scratch/pi-hub-remote-workspace/evidence/parent-acceptance/acceptance.json`。
+
+本机已将验收通过的 Intel 包安装到 `~/Applications/Pi Hub.app`。从安装路径使用自有 profile 实际启动并通过数据库迁移测试，安装包资产通过「远端任务」入口与本地审核流程测试。安装包摘要及 21 项运行资源复核一致，实际 `~/.pi-hub` 下 10 个顶层普通文件的摘要一致。安装与启动回执见本机 `.scratch/pi-hub-remote-workspace/evidence/local-install/verified.json`。
+
+## 2026-11-18 Pi Coding Agent 默认联动
+
+独立服务回归 26 文件、181 项通过，原有 opt-in 规模探针 1 项跳过。类型、项目策略和 7 项治理检查通过。官方 latest、锁定安装、外部及双架构包内 Pi 均为 1.5.2，本机 Node 24.16.0、macOS 15.7.7 Intel。
+
+仓库外 Intel 包的 7 项相关静默桌面检查一次通过。新增测试从「在 Pi 中打开」出发，在受控 AppleEvents 拒绝后使用实际手动启动命令，以自有 PTY 启动 Pi SDK 和 TUI。确定性本地模型调用内置工具，验证项目目录、自动关联、发起提交审核、GUI 拒绝、`/new` 后通过 Pi 选择另一任务，以及旧操作回执越界时被拒绝。未生成 CLI 启动器，预置版本后的自有 Pi 设置字节一致。实际解包的外部 Agent CLI 与原终端选择流程也通过回归。8 份窗口及清理回执未记录窗口激活违规，已记录的 Electron、PTY 和本机回环 SSH 测试进程均已退出。
+
+首轮原生测试最后的设置断言失败，因为 Pi 首次启动写入 `lastChangelogVersion`，测试预置该值后通过。首轮完整服务运行有 179 项通过、2 项失败。周期取消测试缺少取证目录，重启后扫描重叠来源测试超过原 15 秒预算。准备好目录后，单独运行完整服务套件通过，两项测试的断言和超时保持原值。
+
+双架构各核对 95 项构建输入及 21 项运行资产，仓库外 Intel 副本在 CLI 完整性检查前后匹配。构建收据 SHA-256 为 `bd4a387fdccf6156b08f9767d47b4a4702ca789e937f9d074dbb09fe385cbe7d`，x64 ASAR 为 `7ba3d217e77332371477264d1ea0cdb9862f0f5327625b1899049cdcf6aa9df8`，arm64 ASAR 为 `1318fd209474a36c12d78fd753d3747fff4297d96d67a67501d85fc334d01b20`。本轮未重新验证 Terminal/Ghostty 系统控制、真实 Linux 或 Slurm 作业及 Apple Silicon 实机。本机回执与首轮失败位于 `.scratch/pi-hub-native-remote/evidence/acceptance.json` 及同目录 `runs/`。
+
+应用户要求，将上述 Intel 包更新到 `~/Applications/Pi Hub.app`，并复核安装位置的 ASAR、95 项构建输入和 21 项运行资产。使用隔离配置从该位置实际启动，数据库迁移检查通过；安装包资产中的「在 Pi 中打开」及原生联动检查通过。`~/.pi-hub` 下 10 个顶层普通文件摘要一致，3 份 Electron 清理回执和 PTY 记录对应的 18 个进程身份均已结束。安装回执见本机 `.scratch/pi-hub-native-remote/evidence/local-install/verified.json`。
+
+## 2026-11-18 远端工作区服务器侧栏
+
+将当前渲染器构建到已验收 Intel 应用的临时副本，用隔离配置运行远端工作区的 4 项桌面检查，全部通过。核对空态、按名称和主机搜索、清除搜索、两个菜单的位置、键盘选择、弹窗关闭后的焦点返回，以及浅色、深色和窄窗。首轮截图发现弹出菜单偏移到窗口左上角，显式绑定到各自的按钮后复测通过。4 份静默窗口记录无激活违规，24 个 Electron 进程身份及回环 SSH 测试进程均已退出。已安装应用的 ASAR 摘要复核一致。
+
+`npm run check` 的类型、项目策略和 7 项治理检查通过。服务回归 26 文件、181 项通过，原有 1 项可选规模探针跳过。使用当前 Pi 1.5.2、Node 24.16.0。截图和测试回执位于本机 `.scratch/pi-hub-remote-sidebar/evidence/`。
+
+随后构建 Intel 和 Apple Silicon 两份应用，各核对 96 项构建输入、21 项运行资产与目标 CPU。将 Intel 版更新到 `~/Applications/Pi Hub.app`，安装后的 ASAR SHA-256 为 `d94e7fb2f3e96a945ac5a9c04d031f043cf15ad6f99eb876c24c6b6c0b2aaf9c`。使用隔离配置从安装路径实际启动，数据库迁移检查通过。安装包资产的 4 项远端工作区桌面检查全部通过。`~/.pi-hub` 中 11 个顶层普通文件的摘要一致，记录的 34 个 Electron 进程与 1 个回环 SSH 测试进程均已退出。安装回执见本机 `.scratch/pi-hub-remote-sidebar/evidence/local-install/verified.json`。
+
+## 2026-11-18 默认 SSH 配置导入
+
+对隔离 HOME 中的 `~/.ssh/config` 从正式 Intel 包中验证默认配置缺失提示、直接预览别名、跳板缺项提示、连接字段和 `~/` 路径预填，以及取消后不新增服务器且配置文本不变。继续验证原有选择文件和粘贴入口。远端工作区 4 项静默桌面检查通过，4 份窗口回执未记录激活违规，24 个 Electron 进程与 1 个自有回环 SSH 进程均已退出。
+
+Pi 最新版 1.5.2、Node 24.16.0。过滤快测 21 项通过，类型、项目策略和 7 项治理检查通过。完整服务回归 184 项通过，1 项原有可选规模测试跳过。Intel 构建核对 97 项输入、21 项运行资产，ASAR SHA-256 为 `a836c049c1c1992097d23968d878da668ed27799df5913984af1307823ae5a5f`。原始运行数据和构建路径见本机 `.scratch/pi-hub-default-ssh/evidence/acceptance.json`。
+
+将同一 Intel 构建更新到 `~/Applications/Pi Hub.app`。安装后核对包内容和 ASAR 摘要，使用隔离配置验证安装路径的实际启动和数据库迁移，并从安装包资产复测默认 SSH 配置预览及文件选择流程，两项桌面检查通过。`~/.pi-hub` 中 10 个顶层普通文件的摘要一致，记录的 16 个 Electron 进程均已退出。安装回执见本机 `.scratch/pi-hub-default-ssh/evidence/local-install/verified.json`。
+
+### 默认 SSH 预览兼容主机公钥选项
+
+使用合成配置复现了 `StrictHostKeyChecking` 导致别名无法预览。修正后，含 `StrictHostKeyChecking no`、`UserKnownHostsFile /dev/null` 的别名可以导入，服务器表单的主机公钥字段仍为空，首次连接的指纹须明确核对。Pi 1.5.2、Node 24.16.0，21 项过滤快测、7 项治理检查及 184 项服务测试通过，1 项可选规模测试跳过。
+
+Intel 修正包的 97 项构建输入和 21 项运行资产已核对。安装至 `~/Applications/Pi Hub.app` 后，实际应用启动检查、默认配置导入检查和自有回环 SSH 指纹确认检查均通过。安装 ASAR SHA-256 为 `595fded2a2773167140c573aa22270bac28ff006bbd17b0fe78db928c94596b0`。实际 profile 中 10 个顶层普通文件摘要一致，记录的 22 个 Electron 进程和 1 个回环 SSH 进程均已退出。原始复现和安装回执见本机 `.scratch/pi-hub-ssh-trust-import/evidence/`。
+
+## 2026-11-18 本地与远端工作区栏宽调整
+
+在隔离 profile 中使用合成会话和远端任务，验证了两条分隔线只改变相邻两栏、栏宽上下限、键盘调整和默认恢复、两个工作区分别记忆布局，以及缩窄后放宽和重新启动后的恢复。在 760、1050、1051 和 1440 CSS px 检查内容重排、拖动取消、详情切换、表单草稿和 Esc 后焦点。正式 Intel 包资产上的 7 项相关静默桌面检查通过，追加的预览连续性检查也通过。10 份清理回执确认记录的 58 个 Electron 进程已退出，另有 1 个隔离回环 SSH 进程退出。窗口回执未记录激活违规。
+
+使用最新 Pi 1.5.2 和 Node 24.16.0。类型、项目策略和 7 项治理检查通过。完整服务回归 184 项通过，1 项原有可选规模测试跳过。Intel 包校验核对 98 项构建输入和 21 项运行资产，ASAR SHA-256 为 `501b6fc6562146119f765e56d961c323e66aa1120a4b1a1406c007ea29408a0b`。
+
+同一 Intel 包已更新至 `~/Applications/Pi Hub.app`，安装后重新核对包资产和摘要。使用隔离配置完成实际可执行文件启动及迁移检查，并用已安装的包资产复测两套工作区的拖动和重启恢复，两项桌面检查均通过。实际 profile 中 10 个顶层普通文件的摘要一致，22 个记录的测试进程均已退出。安装回执见本机 `.scratch/pi-hub-workspace-columns/evidence/local-install/verified.json`。
+
+首轮新增用例的拖动预期数值有误，修正后通过。中间包的一次远端工作进程重启检查及其测试清理超时，后续进程核对未发现该隔离根下的残留进程，最终包上的同项检查通过。原始运行日志、截图和包路径见本机 `.scratch/pi-hub-workspace-columns/evidence/acceptance.json` 及同目录各运行记录。

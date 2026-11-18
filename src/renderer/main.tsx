@@ -1,3 +1,5 @@
+import { RemoteWorkspace } from './remote-workspace';
+import { WorkspaceColumns, useWorkspaceViewport } from './workspace-columns';
 import { RenameDialog } from './rename-dialog';
 import { CloneDialog } from './clone-dialog';
 import { SessionActions } from './session-actions';
@@ -45,6 +47,7 @@ declare global {
 }
 
 function App() {
+  const [remoteOpen, setRemoteOpen] = useState(false);
   const [menuAction, setMenuAction] = useState<{
     row: WorkspaceSnapshot['sessions'][number];
     type: 'rename' | 'clone' | 'classify' | 'exit';
@@ -238,7 +241,7 @@ function App() {
     });
   }
   async function launchRequest(request: OpenSessionRequest) {
-    const target = request.key ?? 'new:' + request.projectId;
+    const target = request.key ?? (request.remoteTaskId ? 'remote:' + request.remoteTaskId : 'new:' + request.projectId);
     if (terminalBusy.current.has(target)) return;
     terminalBusy.current.add(target);
     setTerminalWorking(true);
@@ -310,13 +313,8 @@ function App() {
   const [sort, setSort] = useState<'recent' | 'name' | 'created' | 'manual'>('recent');
   const [allScope, setAllScope] = useState<'main' | 'all'>('main');
   const [archiveProject, setArchiveProject] = useState('');
-  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 1050px)').matches);
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 1050px)');
-    const changed = () => setNarrow(media.matches);
-    media.addEventListener('change', changed);
-    return () => media.removeEventListener('change', changed);
-  }, []);
+  const viewport = useWorkspaceViewport();
+  const { narrow } = viewport;
   const [selected, setSelected] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   useEffect(() => {
@@ -578,13 +576,72 @@ function App() {
     >
       <Plus size={16} aria-hidden="true" />添加项目</button>
   );
+  const recoveringSession = recovering && workspace?.sessions.find((s) => s.key === recovering.key);
+  const terminalDialogs = (
+    <>
+    {terminalFeedback && (
+        <TerminalOperationDialog
+          terminalName={terminalFeedback.terminal ?? (terminalWorking ? '外部终端' : terminalName)}
+          initial={terminalFeedback.outcome}
+          requestId={terminalFeedback.requestId}
+          error={terminalFeedback.error}
+          working={terminalWorking}
+          onClose={() => setTerminalFeedback(null)}
+          onChanged={terminalOutcome}
+        />
+      )}
+    {recovering && recoveringSession && workspace && (
+        <DirectoryRecoveryDialog
+          terminalName={recovering.terminal ?? terminalName}
+          session={recoveringSession}
+          projects={workspace.projects}
+          onClose={() => setRecovering(null)}
+          onContinue={async (runtimeProjectId) => {
+            const request = { ...recovering, runtimeProjectId };
+            setRecovering(null);
+            await launchRequest(request);
+          }}
+        />
+      )}
+    {terminalPicker && (
+        <TerminalSettings
+          onClose={() => setTerminalPicker(null)}
+          onChoose={async (terminal, rememberTerminal) => {
+            const request = { ...terminalPicker, terminal, rememberTerminal };
+            setTerminalPicker(null);
+            setTerminalName(terminal);
+            await launchRequest(request);
+          }}
+        />
+      )}
+    </>
+  );
+  if (remoteOpen) return (
+    <div className="app-shell">
+      <div className="titlebar"><span>Pi Hub</span></div>
+      <RemoteWorkspace
+        viewport={viewport}
+        back={() => setRemoteOpen(false)}
+        openPi={(remoteTaskId) => void launchRequest({ requestId: crypto.randomUUID(), intent: 'new', remoteTaskId })}
+        openSource={(source) => {
+          setRemoteOpen(false);
+          const matches = sessions.filter((s) => s.headerId === source.sessionId &&
+            (!source.projectId || s.projectId === source.projectId) &&
+            (!source.identity || s.identity === source.identity));
+          if (matches.length === 1) void locateSession(matches[0].key);
+          else setNotice(matches.length ? '来源 ID 对应多个物理会话，请在本地列表核对。' : '关联会话当前不可用；远端记录仍保留。');
+        }}
+      />
+      {terminalDialogs}
+    </div>
+  );
   return (
     <div className="app-shell">
     <div className="titlebar">
         <span>Pi Hub</span>
       </div>
-    <div className="workspace">
-      <aside className="sidebar" aria-label="项目导航">
+    <WorkspaceColumns kind="local" viewport={viewport} blocked={narrow && !!selectedSession && previewOpen}>
+      <aside id="local-navigation" className="sidebar" aria-label="项目导航">
         <div className="workspace-brand">
             <span className="brand-mark">
               <Terminal size={20} strokeWidth={1.65} />
@@ -596,6 +653,7 @@ function App() {
           </div>
           <div className="workspace-label">工作区</div>
         <nav aria-label="会话范围">
+          <button className="nav-row" onClick={()=>setRemoteOpen(true)}><Terminal size={17} aria-hidden="true"/><span>远端任务</span></button>
           <button
               className={`nav-row ${scope === 'all' ? 'selected' : ''}`}
               aria-current={scope === 'all' ? 'page' : undefined}
@@ -654,6 +712,7 @@ function App() {
           </div>
       </aside>
       <main
+          id="local-list"
           className="sessions"
           inert={narrow && previewOpen && !!workspace?.sessions.some((s) => s.key === selected)}
         >
@@ -1089,7 +1148,7 @@ function App() {
           onClose={closePreview}
           copyCreated={createdCopyKey === selected}
         />
-    </div>
+    </WorkspaceColumns>
     {menuAction?.type === 'rename' && (
         <RenameDialog
           sourceKey={menuAction.row.key}
@@ -1166,41 +1225,7 @@ function App() {
           }}
         />
       )}
-    {terminalFeedback && (
-        <TerminalOperationDialog
-          terminalName={terminalFeedback.terminal ?? (terminalWorking ? '外部终端' : terminalName)}
-          initial={terminalFeedback.outcome}
-          requestId={terminalFeedback.requestId}
-          error={terminalFeedback.error}
-          working={terminalWorking}
-          onClose={() => setTerminalFeedback(null)}
-          onChanged={terminalOutcome}
-        />
-      )}
-    {recovering && workspace?.sessions.find((s) => s.key === recovering.key) && (
-        <DirectoryRecoveryDialog
-          terminalName={recovering.terminal ?? terminalName}
-          session={workspace.sessions.find((s) => s.key === recovering.key)!}
-          projects={workspace.projects}
-          onClose={() => setRecovering(null)}
-          onContinue={async (runtimeProjectId) => {
-            const request = { ...recovering, runtimeProjectId };
-            setRecovering(null);
-            await launchRequest(request);
-          }}
-        />
-      )}
-    {terminalPicker && (
-        <TerminalSettings
-          onClose={() => setTerminalPicker(null)}
-          onChoose={async (terminal, rememberTerminal) => {
-            const request = { ...terminalPicker, terminal, rememberTerminal };
-            setTerminalPicker(null);
-            setTerminalName(terminal);
-            await launchRequest(request);
-          }}
-        />
-      )}
+    {terminalDialogs}
     {newProjectPicker && (
         <dialog
           ref={newDialog}
