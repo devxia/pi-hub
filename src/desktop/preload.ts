@@ -93,3 +93,9 @@ const api: DesktopSessionManagement = {
   listSessions: (request) => ipcRenderer.invoke('sessions:list', request),
 };
 contextBridge.exposeInMainWorld('sessionManagement', api);
+
+contextBridge.exposeInMainWorld('remoteWorkspace', {
+  request: (request) => ipcRenderer.invoke('remote:request', request),
+  choose: (kind, project) => ipcRenderer.invoke('remote:choose', kind, project),
+  previewDefaultSSH: () => ipcRenderer.invoke('remote:previewDefaultSSH'),
+} satisfies import('../remote/contract').RemoteAPI);

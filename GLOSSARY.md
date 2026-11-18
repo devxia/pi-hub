@@ -23,5 +23,18 @@
 | 请求核对（Reconciliation） | 使用同一 GUI 请求身份查询原动作/回执，避免结果未知时重复副作用。 |
 | 退出会话（Exit Session） | 正常停止选定可控实例并关闭精确终端对象；不删除会话。 |
 | 删除会话（Delete Session） | 用户确认后优先废纸篓、失败再永久删除原文件并清除 Hub 条目/分类，独立副本保留。 |
+| 远端服务器（Server） | 独立本机 ID、连接 revision、逐跳主机信任和能力记录；旧执行保存不可变快照。 |
+| 远端任务（Task） | 逻辑计算任务、项目、前台 argv、输入与产物声明，区别于 Pi Session。 |
+| 执行（Attempt） | 一次不可变 executionId、输入摘要和类型化远端身份；未知时不重新提交。 |
+| 远端操作（Operation） | 持久 requestId 与审批摘要、时效、状态、回执；相同 ID 不允许改变摘要。 |
+| 观察（Observation） | worker generation 和递增 sequence 下的有限状态/日志，离线保留最后已知状态。 |
+| LinuxRef | host/user/boot、supervisor/helper/workload 的 PID+start、PGID 和私有 endpoint 代次。 |
+| ExternalLinuxRef | 只读外部进程的 host/user/boot/PID+start/PGID，不伪装受管 supervisor。 |
+| SlurmRef | 完整 JobID、owner、cluster、submit time、name、可用 SLUID/restart，禁止裸 JobID 写入。 |
+| 启动意图（Launch Intent） | 任何远端 spawn/sbatch 之前 fsync+原子发布的单次意图；存在即禁止重放。 |
+| 作用域结束（Scope Ended） | 两级 subreaper 均到 ECHILD；与主程序退出原因、取消请求投递分开。 |
+| Agent 授权（Grant） | 当前 profile 下有服务器/项目/对象/动作范围与到期时间的可撤销凭据，不替代 GUI 摘要审批。 |
+| 流式对象票据（Transfer Ticket） | 私有、限时、绑定工作根身份的编号文件清单；SFTP 仅传这些对象，校验后独占发布，不是任意文件系统 API。 |
+| 能力验收记录（Capability Receipt） | schema=1 的主机/user/boot、监督器和工具摘要、原始证据摘要与有效期记录；仅实际授权检查通过才发布，缺项保持关闭。 |
 
 完整行为以[产品规格](docs/product-spec.md)为准，架构定义见[文档入口](docs/README.md)。

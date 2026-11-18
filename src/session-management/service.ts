@@ -1,3 +1,4 @@
+import type { NativePiBridge } from '../remote/contract';
 import { sessionDeletes, type DeleteAdapter } from './session-deletes';
 import { sessionNames } from './session-names';
 import { nativeClones } from './native-clones';
@@ -36,6 +37,7 @@ export async function openSessionManagement(
     runtime?: RuntimeOptions;
     terminal?: TerminalOptions;
     deletion?: DeleteAdapter;
+    nativePi?: NativePiBridge;
   } = {},
 ): Promise<Result<SessionManagement>> {
   let db: Database.Database;
@@ -167,6 +169,7 @@ export async function openSessionManagement(
         preview.applyRuntime,
         live.invalidatePreview,
         live.reconcileSource,
+        options.nativePi,
       );
   } catch (error) {
     await live.close();
@@ -178,7 +181,7 @@ export async function openSessionManagement(
   const runtimeSnapshot = () => live.getSnapshot();
   const terminal = terminalSettings(
     db,
-    options.terminal,
+    options.terminal && { ...options.terminal, nativePi: options.nativePi },
     configuration,
     hosts,
     runtimeSnapshot,

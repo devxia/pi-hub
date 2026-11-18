@@ -26,7 +26,7 @@ export function machOArchitectures(header) {
 }
 export function checkArchiveEntries(entries) {
   for (const entry of entries) {
-    if (!/^\/(?:package\.json$|node_modules(?:\/|$)|dist(?:\/|$))/.test(entry) || /^\/dist\/(?!desktop(?:\/|$)|renderer(?:\/|$)|terminal(?:\/|$))/.test(entry) || /\.app(?:\/|$)/i.test(entry)) {
+    if (!/^\/(?:package\.json$|node_modules(?:\/|$)|dist(?:\/|$))/.test(entry) || /^\/dist\/(?!desktop(?:\/|$)|renderer(?:\/|$)|terminal(?:\/|$)|remote(?:\/|$))/.test(entry) || /\.app(?:\/|$)/i.test(entry)) {
       throw Error('Unexpected development/output path in package: ' + entry);
     }
   }
@@ -50,6 +50,13 @@ export async function checkPackage({app, arch, root = repository}) {
   for (const [path, hash] of Object.entries(receipt.runtime)) {
     if (asar.statFile(archive, path, false).link || digest(asar.extractFile(archive, path)) !== hash) throw Error('Runtime asset mismatch: ' + path);
   }
+  const cliPath='dist/remote/cli.mjs', cliStat=asar.statFile(archive,cliPath,false);
+  if(!cliStat.unpacked || cliStat.link) throw Error('Remote CLI must be an exact unpacked file.');
+  const unpackedCLI=join(app,'Contents/Resources/app.asar.unpacked',cliPath);
+  if(digest(await readFile(unpackedCLI))!==receipt.runtime[cliPath]) throw Error('Unpacked remote CLI differs from build.');
+  for(const name of Object.keys(receipt.runtime).filter(p=>p.startsWith('dist/remote/'))){const info=asar.statFile(archive,name,false);if(!info.unpacked||info.link||digest(await readFile(join(app,'Contents/Resources/app.asar.unpacked',name)))!==receipt.runtime[name])throw Error('Remote standalone asset is not exact/unpacked: '+name);}
+  const remoteNative=join(app,'Contents/Resources/app.asar.unpacked/dist/remote/secure-fs.node'),nativeCPUs=machOArchitectures(await readFile(remoteNative));
+  if(!nativeCPUs.includes(arch))throw Error('Remote filesystem native CPU mismatch.');
   const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   const packaged = JSON.parse(asar.extractFile(archive, 'package.json').toString());
   for (const key of ['name', 'productName', 'version', 'dependencies']) {
@@ -66,7 +73,7 @@ export async function checkPackage({app, arch, root = repository}) {
   ];
   const binaries = [];
   for (const path of targets) binaries.push({path, arch: await checkCPU(join(app, path), arch)});
-  return {app: resolve(app), arch, pi: pi.version, runtimeAssets: packagedRuntime.length, buildInputs: Object.keys(receipt.inputs).length, asarSha256: digest(await readFile(archive)), binaries};
+  return {app: resolve(app), arch, pi: pi.version, runtimeAssets: packagedRuntime.length, buildInputs: Object.keys(receipt.inputs).length, asarSha256: digest(await readFile(archive)), remoteNative: {path:remoteNative,architectures:nativeCPUs}, binaries};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2);

@@ -5,6 +5,7 @@
 | 内容 | 文档 |
 | --- | --- |
 | 完整产品契约与边界 | [产品规格](product-spec.md) |
+| 远端服务器、任务与 Agent CLI 契约 | [远端工作区](remote-workspace.md) |
 | 用户任务与界面组织 | [设计简报](design-brief.md) |
 | 视觉、组件与交互规范 | [DESIGN.md](../DESIGN.md) |
 | 可操作设计样板 / 变量 | [样板](design/clear-order.html) / [变量](design/clear-order.tokens.css) |
@@ -25,5 +26,6 @@
 4. [源身份与请求核对](adr/0004-source-and-request-identity.md)
 5. [共享后台与窗口权限](adr/0005-desktop-windows-and-ipc.md)
 6. [更新渠道与发布职责（暂缓实施）](adr/0006-update-channel.md)
+7. [独立远端 worker 与执行权威](adr/0007-remote-workspace.md)
 
 原始测试回执用于追溯某次运行，不构成产品规则。已完成任务的有效内容归入上述正文；测试版本与失败限制统一在验证记录说明。

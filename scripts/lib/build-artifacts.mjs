@@ -2,7 +2,7 @@ import {readFile, readdir, writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join, relative} from 'node:path';
 
-export const runtimeDirectories = ['desktop', 'renderer', 'terminal'];
+export const runtimeDirectories = ['desktop', 'renderer', 'terminal', 'remote'];
 export const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function filesUnder(root) {
   const files = [];

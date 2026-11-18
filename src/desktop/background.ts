@@ -1,3 +1,4 @@
+import type { NativePiBridge, NativePiRequest } from '../remote/contract';
 import { deletePublicationMatches } from '../session-management/delete-source-facts';
 import { executeTerminalAdapter, type TerminalAdapterRequest } from './terminal-adapter-contract';
 import { terminalAdapter } from './terminal-adapter';
@@ -39,6 +40,7 @@ export class BackgroundSessionManagement {
   constructor(
     private databasePath: string,
     private onSnapshot: (snapshot: WorkspaceSnapshot) => void,
+    private nativePi: NativePiBridge,
   ) {}
 
   private request<T>(command: string, request?: unknown): Promise<Result<T>> {
@@ -56,7 +58,16 @@ export class BackgroundSessionManagement {
           snapshot?: WorkspaceSnapshot;
           trashAdapter?: TrashAdapterRequest;
           terminalAdapter?: TerminalAdapterRequest;
+          nativePi?: { id: number; request: NativePiRequest };
         }) => {
+          if (message.nativePi) {
+            const { id, request } = message.nativePi;
+            void this.nativePi(request).catch(() => ({ ok: false, error: '远端任务服务暂不可用。' }))
+              .then((reply) => {
+                if (this.worker === worker) worker.postMessage({ nativePiReply: { id, reply } });
+              });
+            return;
+          }
           if (message.trashAdapter) {
             const r = message.trashAdapter;
             void (

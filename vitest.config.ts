@@ -3,6 +3,10 @@ import {resolve} from 'node:path';
 
 // Real SDK/CLI/PTY/shell paths and the opt-in scale probe are not the local quick lane.
 const integration = [
+  'tests/service/remote-boundaries.test.ts',
+  'tests/service/remote-ssh.test.ts',
+  'tests/service/remote-sftp.test.ts',
+  'tests/service/remote-protocol.test.ts',
   'tests/service/auto-terminal.test.ts',
   'tests/service/native-session-commands.test.ts',
   'tests/service/pi-sdk-client.test.ts',

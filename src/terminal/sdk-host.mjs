@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
+import { createRequire } from 'node:module';
 const hash = (b) => createHash('sha256').update(b).digest('hex');
 function privateFile(path) {
   const s = lstatSync(path);
@@ -143,6 +144,104 @@ function sendReport() {
     socket?.destroy();
   }
 }
+const remoteReplies = new Map();
+function remoteRequest(request, expectedGeneration, signal) {
+  const connection = socket;
+  if (signal?.aborted || generation !== expectedGeneration)
+    return Promise.reject(Error('Pi 会话已切换或请求已取消。'));
+  if (!connection?.writable || connection.writableLength > 32768)
+    return Promise.reject(Error('请打开 Pi Hub，等待此会话连接后再查询。'));
+  const id = randomUUID();
+  const frame = JSON.stringify({ kind: 'remote', id, generation,
+    sessionId: runtimeHost.session.sessionManager.getSessionId(), request }) + '\n';
+  if (Buffer.byteLength(frame) > 32768)
+    return Promise.reject(Error('请求过大，请缩小范围。'));
+  sendReport();
+  return new Promise((resolve, reject) => {
+    const finish = (result) => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', interrupted);
+      remoteReplies.delete(id);
+      if (result?.ok && generation === expectedGeneration) resolve(result.value);
+      else reject(Error(result?.error ?? '连接中断或 Pi 会话已切换，请核对原操作。'));
+    };
+    const interrupted = () => finish({ error: '等待已取消，请在 Pi Hub 核对原操作。' });
+    const timer = setTimeout(() => finish({ error: '等待响应超时，请在 Pi Hub 核对原操作。' }), 12000);
+    remoteReplies.set(id, { connection, finish });
+    signal?.addEventListener('abort', interrupted, { once: true });
+    connection.write(frame);
+  });
+}
+async function chooseRemoteTask(call, ctx, signal) {
+  const bound = await call({ command: 'binding' });
+  if (bound) return bound;
+  if (!ctx.hasUI) return false;
+  let offset = 0;
+  while (!signal?.aborted) {
+    const page = await call({ command: 'choices', offset });
+    if (!page.tasks.length) throw Error('请先在 Pi Hub 的远端任务页创建任务。');
+    const labels = page.tasks.map((task, i) => `${offset + i + 1}. ${task.name} · ${task.server}`);
+    const options = [...labels];
+    if (offset) options.push('上一页');
+    if (page.next !== null) options.push('下一页');
+    const answer = await ctx.ui.select('选择此 Pi 会话要关联的远端任务', options, { signal });
+    if (answer === undefined || signal?.aborted) return false;
+    if (answer === '上一页') offset = Math.max(0, offset - 10);
+    else if (answer === '下一页') offset = page.next;
+    else {
+      const task = page.tasks[labels.indexOf(answer)];
+      if (!task) return false;
+      return await call({ command: 'bind', taskId: task.id });
+    }
+  }
+  return false;
+}
+function remoteTool(extension, Type, sessionGeneration) {
+  extension.registerTool({
+    name: 'pi_hub_remote',
+    label: 'Pi Hub 远端任务',
+    description: 'Inspect the remote task selected for this Pi session. Submit, cancel and fetch create requests for the user to approve in Pi Hub.',
+    promptSnippet: 'Inspect the linked Pi Hub remote task and request operations for user approval.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      action: Type.Union(['list', 'status', 'logs', 'operation', 'submit', 'cancel', 'fetch'].map((name) => Type.Literal(name))),
+      attemptId: Type.Optional(Type.String({ description: 'Execution ID from list, for status, logs, cancel or fetch.' })),
+      requestId: Type.Optional(Type.String({ description: 'Prior approval request ID for operation.' })),
+      offset: Type.Optional(Type.Integer({ minimum: 0 })),
+      length: Type.Optional(Type.Integer({ minimum: 1, maximum: 4096 })),
+      force: Type.Optional(Type.Boolean({ description: 'Request force cancellation, also subject to approval.' })),
+      paths: Type.Optional(Type.Array(Type.String(), { minItems: 1, maxItems: 256, description: 'Artifacts declared in status.' })),
+      destination: Type.Optional(Type.String({ description: 'Absolute local destination for fetch.' })),
+      overwrite: Type.Optional(Type.Boolean()),
+    }),
+    async execute(toolCallId, params, signal, _onUpdate, ctx) {
+      const current = sessionGeneration();
+      const call = (request) => remoteRequest(request, current, signal);
+      const result = (value) => ({ content: [{ type: 'text', text: JSON.stringify(value) }], details: value });
+      try {
+        const taskId = await chooseRemoteTask(call, ctx, signal);
+        if (!taskId) return result({ error: '未选择远端任务。' });
+        const { action, attemptId, requestId, offset, length, force, paths, destination, overwrite } = params;
+        if (action === 'list') return result(await call({ command: 'snapshot' }));
+        if (action === 'operation') return result(await call({ command: 'operation', requestId }));
+        if (action === 'status') return result(await call({ command: 'status', attemptId }));
+        if (action === 'logs') return result(await call({ command: 'logs', attemptId, offset: offset ?? 0, length: length ?? 4096 }));
+        const operationId = hash(`${d.hostId}:${current}:${toolCallId}`);
+        const requested = action === 'submit' ? { kind: action, taskId }
+          : action === 'cancel' ? { kind: action, attemptId, force: force ?? false }
+          : { kind: action, attemptId, paths, destination, overwrite };
+        try {
+          const receipt = await call({ command: 'propose', requestId: operationId, action: requested });
+          return result({ ...receipt, message: '请在 Pi Hub → 远端任务 → 待审与近期操作中核对。' });
+        } catch (error) {
+          return result({ error: String(error.message ?? error), requestId: operationId });
+        }
+      } catch (error) {
+        return result({ error: String(error.message ?? error) });
+      }
+    },
+  });
+}
 function schedule() {
   if (!stopped) {
     retry = setTimeout(connect, 1000);
@@ -224,6 +323,9 @@ function connect() {
     s.on('error', () => {});
     s.on('close', () => {
       if (socket === s) socket = undefined;
+      for (const pending of remoteReplies.values()) {
+        if (pending.connection === s) pending.finish();
+      }
       schedule();
     });
     s.on('data', (bytes) => {
@@ -241,6 +343,11 @@ function connect() {
           try {
             c = JSON.parse(line);
             if (c.kind === 'ack') return;
+            if (c.kind === 'remote-result') {
+              const pending = remoteReplies.get(c.id);
+              if (pending?.connection === s) pending.finish(c.result);
+              return;
+            }
             if (c.kind === 'query') {
               if (
                 Object.keys(c).some((k) => !['kind', 'id', 'requestId'].includes(k)) ||
@@ -330,6 +437,8 @@ try {
   )
     throw Error('Unsupported public Pi SDK');
   const pi = await import(pathToFileURL(sdk.entryPath).href);
+  const sdkRequire = createRequire(sdk.entryPath);
+  const { Type } = await import(pathToFileURL(sdkRequire.resolve('typebox')).href);
   const manager = d.source
     ? pi.SessionManager.open(d.source.path, d.sessionDir, d.cwd)
     : pi.SessionManager.create(d.cwd, d.sessionDir);
@@ -398,7 +507,9 @@ try {
         settingsManager.getDefaultProvider()) === 'llama.cpp'
     )
       throw Error('This SDK host does not provide the CLI built-in llama.cpp integration');
+    let sessionGeneration;
     const extensionFactories = [
+      { name: 'pi-hub-remote', factory: (extension) => remoteTool(extension, Type, () => sessionGeneration), builtin: true },
       { name: 'codemode', factory: pi.createCodemodeExtension(), builtin: true, replaceable: true },
       {
         name: 'tool-search',
@@ -420,7 +531,7 @@ try {
       sessionManager,
       sessionStartEvent,
     });
-    generation = randomUUID();
+    generation = sessionGeneration = randomUUID();
     sequence = 0;
     result.session.subscribe((e) => {
       if (

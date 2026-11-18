@@ -13,6 +13,7 @@ import {
   type PreviewRuntime,
 } from './interface';
 import { readIdentity } from './history-reader';
+import type { NativePiBridge, NativeTaskScope, Reply } from '../remote/contract';
 
 export interface HostReport {
   hostId: string;
@@ -33,6 +34,7 @@ interface HostRecord {
   requestId: string;
   statusPath: string;
   report?: HostReport;
+  nativeTask?: NativeTaskScope;
 }
 interface Pending {
   hostId: string;
@@ -104,6 +106,7 @@ export async function runtimeHosts(
   apply: (r: PreviewRuntime[]) => Result<null>,
   changed: () => void,
   reconcile: (file: string) => Promise<unknown>,
+  nativePi?: NativePiBridge,
 ) {
   const directory = `/tmp/pi-hub-${process.getuid!()}-${createHash('sha256').update(options.appData).digest('hex').slice(0, 16)}`;
   await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -215,7 +218,8 @@ export async function runtimeHosts(
     connections.add(socket);
     let input = '',
       hostId: string | undefined,
-      queue = Promise.resolve();
+      queue = Promise.resolve(),
+      remotePending = false;
     const handshake = setTimeout(() => {
       if (!hostId) socket.destroy();
     }, 5000);
@@ -279,6 +283,8 @@ export async function runtimeHosts(
               const previous = clients.get(hostId);
               if (previous && previous !== socket) previous.destroy();
               clients.set(hostId, socket);
+              if (oldReport && (oldReport.generation !== r.generation || oldReport.sessionId !== r.sessionId))
+                delete h.nativeTask;
               h.report = r;
               save(h);
               if (oldReport?.file !== r.file && oldReport?.persisted)
@@ -289,6 +295,61 @@ export async function runtimeHosts(
                 socket.write(JSON.stringify({ kind: 'ack', hostId }) + '\n');
                 if (dirty) changed();
               }
+            } else if (message.kind === 'remote') {
+              if (!hostId || clients.get(hostId) !== socket ||
+                  typeof message.id !== 'string' || !/^[a-f0-9-]{36}$/.test(message.id))
+                throw Error('Untrusted Pi remote request');
+              const id = hostId;
+              const h = read(id);
+              const current = () => {
+                if (closing || socket.destroyed || clients.get(id) !== socket) return;
+                const latest = read(id);
+                if (latest?.report && latest.report.generation === message.generation &&
+                    latest.report.sessionId === message.sessionId) return latest;
+              };
+              const reply = (result: Reply) => {
+                if (!current()) return;
+                const encode = (value: Reply) => JSON.stringify({ kind: 'remote-result', id: message.id, result: value }) + '\n';
+                const frame = encode(result);
+                socket.write(Buffer.byteLength(frame) <= MAX_FRAME ? frame :
+                  encode({ ok: false, error: '结果超出单次容量，请缩小查询范围。' }));
+              };
+              if (!h || !current()) return;
+              if (remotePending || !nativePi) {
+                reply({ ok: false, error: '远端任务暂时不可用，请稍后查询。' });
+                return;
+              }
+              remotePending = true;
+              track((async () => {
+                try {
+                  const action = message.request;
+                  if (action?.command === 'binding') {
+                    reply({ ok: true, value: h.nativeTask?.id ?? null });
+                  } else if (action?.command === 'choices' && !h.nativeTask) {
+                    reply(await nativePi({ command: 'choices', offset: action.offset }));
+                  } else if (action?.command === 'bind' && !h.nativeTask) {
+                    const result = await nativePi({ command: 'bind', taskId: action.taskId });
+                    const latest = current();
+                    if (!latest) return;
+                    if (result.ok) {
+                      latest.nativeTask = result.value as NativeTaskScope;
+                      save(latest);
+                    }
+                    reply(result.ok ? { ok: true, value: latest.nativeTask!.id } : result);
+                  } else if (h.nativeTask) {
+                    reply(await nativePi({
+                      command: 'task', subject: `pi:${id}:${message.generation}`,
+                      scope: h.nativeTask, request: action,
+                    }));
+                  } else {
+                    reply({ ok: false, error: '请先在 Pi 中选择远端任务。' });
+                  }
+                } catch {
+                  reply({ ok: false, error: '远端任务服务已中断，请核对原操作。' });
+                } finally {
+                  remotePending = false;
+                }
+              })());
             } else if (message.kind === 'result') {
               if (
                 !hostId ||
@@ -357,8 +418,8 @@ export async function runtimeHosts(
   }
   return {
     credentialPath,
-    register(requestId: string, statusPath: string) {
-      const h = { hostId: randomUUID(), requestId, statusPath };
+    register(requestId: string, statusPath: string, nativeTask?: NativeTaskScope) {
+      const h = { hostId: randomUUID(), requestId, statusPath, nativeTask };
       save(h);
       return h.hostId;
     },
